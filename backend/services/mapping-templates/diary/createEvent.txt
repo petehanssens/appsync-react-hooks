@@ -1,0 +1,22 @@
+{
+    "version" : "2017-02-28",
+    "operation" : "UpdateItem",
+    "key" : {
+        "user_id" : {"S" : "${context.arguments.user_id}" },
+        "date": {"S" : "${context.arguments.date}" }
+    },
+    "update" : {
+        "expression" : "SET diary_entry = list_append(if_not_exists(diary_entry, :emptyList), :newDiaryEntry)",
+        "expressionValues" : {
+            ":emptyList": { "L" : [] },
+            ":newDiaryEntry" : { "L" : [
+                { "M": {
+                    "created_at": {"S" : "$util.time.nowISO8601()" },
+                    "created_epoch": {"N" : "$util.time.nowEpochMilliSeconds()" },
+                    "category" : { "S" : "${context.arguments.category}" },
+                    "event" : { "S" : "${context.arguments.event}" }
+                }}
+            ] }
+        }
+    }
+}

@@ -1,0 +1,159 @@
+service: backend
+app: appsync-react-hooks
+provider:
+  name: aws
+  runtime: nodejs10.x
+  stage: ${opt:stage, 'dev'}
+  region: ap-southeast-2
+  deploymentBucket:
+    name: ${self:provider.stage}.${self:app}.${self:provider.region}.deploys # Overwrite the default deployment bucket
+
+plugins:
+   - serverless-appsync-plugin
+   - serverless-pseudo-parameters
+
+custom:
+  service:
+    diary-table: ${self:app}-${self:provider.stage}-${self:service}-diary-table
+
+    private-appsync: ${self:app}-${self:provider.stage}-${self:service}-private-appsync
+    public-appsync: ${self:app}-${self:provider.stage}-${self:service}-public-appsync
+    appsync-role: ${self:app}-${self:provider.stage}-${self:service}-appsync-role
+    appsync-policy: ${self:app}-${self:provider.stage}-${self:service}-appsync-policy
+
+  appSync:
+    - name: ${self:custom.service.private-appsync}
+      schema: src/AppSync/privateSchema.graphql
+      authenticationType: OPENID_CONNECT
+      openIdConnectConfig:
+        issuer: ${ssm:/appsync-react-hooks/dev/auth0/issuer}
+        clientId: ${ssm:/appsync-react-hooks/dev/auth0/clientId}
+        iatTTL: 86400
+        authTTL: 7200
+      serviceRole: AppSyncRole
+      logConfig:
+        loggingRoleArn: { Fn::GetAtt: [AppSyncRole, Arn] } # Where AppSyncLoggingServiceRole is a role with CloudWatch Logs write access 
+        level: ERROR # Logging Level: NONE | ERROR | ALL 
+      dataSources:
+        - type: AMAZON_DYNAMODB
+          name: diaryAppSync
+          description: 'diary App Sync'
+          config:
+            tableName: { Ref: DiaryTable } # Where MyTable is a dynamodb table defined in Resources 
+            serviceRoleArn: { Fn::GetAtt: [AppSyncRole, Arn] } # Where AppSyncDynamoDBServiceRole is an IAM role defined in Resources 
+      mappingTemplates:
+        - dataSource: diaryAppSync
+          type: Mutation
+          field: createEvent
+          request: "diary/createEvent.txt"
+          response: "JSONResponse.txt"
+        - dataSource: diaryAppSync
+          type: Query #Query, Mutation, Subscription
+          field: getEvents
+          request: "diary/getEvents.txt"
+          response: "JSONResponse.txt"
+        - dataSource: diaryAppSync
+          type: Mutation
+          field: deleteEvent
+          request: "diary/deleteEvent.txt"
+          response: "JSONResponse.txt"
+    - name: ${self:custom.service.public-appsync}
+      schema: src/AppSync/publicSchema.graphql
+      authenticationType: API_KEY
+      serviceRole: AppSyncRole
+      logConfig:
+        loggingRoleArn: { Fn::GetAtt: [AppSyncRole, Arn] } # Where AppSyncLoggingServiceRole is a role with CloudWatch Logs write access 
+        level: ERROR # Logging Level: NONE | ERROR | ALL 
+      dataSources:
+        - type: AMAZON_DYNAMODB
+          name: diaryAppSync
+          description: 'Daily Diary App Sync'
+          config:
+            tableName: { Ref: DiaryTable } # Where MyTable is a dynamodb table defined in Resources 
+            serviceRoleArn: { Fn::GetAtt: [AppSyncRole, Arn] } # Where AppSyncDynamoDBServiceRole is an IAM role defined in Resources 
+      mappingTemplates:
+        - dataSource: diaryAppSync
+          type: Mutation
+          field: createEvent
+          request: "diary/createEvent.txt"
+          response: "JSONResponse.txt"
+        - dataSource: diaryAppSync
+          type: Query #Query, Mutation, Subscription
+          field: getEvents
+          request: "diary/getEvents.txt"
+          response: "JSONResponse.txt"
+        - dataSource: diaryAppSync
+          type: Mutation
+          field: deleteEvent
+          request: "diary/deleteEvent.txt"
+          response: "JSONResponse.txt"
+
+
+resources:
+  Resources:
+    DiaryTable:
+      Type: "AWS::DynamoDB::Table"
+      Properties:
+        TableName: ${self:custom.service.diary-table}
+        KeySchema:
+          - AttributeName: user_id
+            KeyType: HASH
+          - AttributeName: date
+            KeyType: RANGE
+        AttributeDefinitions:
+          - AttributeName: user_id
+            AttributeType: S
+          - AttributeName: date
+            AttributeType: S
+        BillingMode: PAY_PER_REQUEST
+
+    AppSyncRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: ${self:custom.service.appsync-role}
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - appsync.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: ${self:custom.service.appsync-policy}
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: 
+                    - 'Fn::Join':
+                        - ':'
+                        - - 'arn:aws:logs'
+                          - Ref: 'AWS::Region'
+                          - Ref: 'AWS::AccountId'
+                          - '*'
+                - Effect: "Allow"
+                  Action:
+                    - "dynamodb:GetItem"
+                    - "dynamodb:Query"
+                    - "dynamodb:UpdateItem"
+                    - "dynamodb:scan"
+                    - "dynamodb:PutItem"
+                    - "dynamodb:DeleteItem"
+                  Resource:
+                    - 'Fn::Join':
+                        - ':'
+                        - - 'arn:aws:dynamodb'
+                          - Ref: 'AWS::Region'
+                          - Ref: 'AWS::AccountId'
+                          - 'table/${self:custom.service.diary-table}'
+                    - 'Fn::Join':
+                        - ':'
+                        - - 'arn:aws:dynamodb'
+                          - Ref: 'AWS::Region'
+                          - Ref: 'AWS::AccountId'
+                          - 'table/${self:custom.service.diary-table}/*'

@@ -1,0 +1,412 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Continuous Integration for project
+
+Parameters:
+  ProjectName:
+    Type: String
+    Description: The name of the project being built.  This name will be used on a number of resources.
+    Default: MyAwesomeProject
+  ProjectParameterOverrides:
+    Type: String
+    Description: JSON string for the parameters of the project template.
+    Default: "{}"
+  GitHubOAuthToken:
+    Type: String
+    Description: GitHub oauth token.  This user must have admin access to the repo.
+    Default: "****"
+    NoEcho: true
+  GitHubRepoOwner:
+    Type: String
+    Description: GitHub repo owner.
+    Default: mycompany
+  GitHubRepo:
+    Type: String
+    Description: GitHub git repo.
+    Default: myreponame
+  GitHubBranch:
+    Type: String
+    Description: Git branch to build off of.
+    Default: master
+  GitHubBranchDest:
+    Type: String
+    Description: Git branch to pull request into after a successful deploy.  Leave empty for no action.
+    Default: ""
+
+Conditions:
+  PullRequestAfterDeploy: !Not [!Equals [!Ref GitHubBranchDest, ""]]
+
+Resources:
+  # S3 bucket where build artifacts go
+  DeploymentArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      AccessControl: Private
+      VersioningConfiguration:
+        # The guide recommends Enabled but I can't see why
+        Status: Enabled
+
+  CodeBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+  CodeBuildServicePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: CodeBuildServicePolicy
+      Roles:
+        - !Ref CodeBuildServiceRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+              - logs:DescribeLogGroups
+            Resource: "arn:aws:logs:*:*:*"
+          - Effect: Allow
+            Action:
+              # - s3:GetObject
+              # - s3:GetObjectVersion
+              # - s3:PutObject
+              - s3:*
+            Resource:
+              # - !Sub "arn:aws:s3:::codepipeline-${AWS::Region}-*/*"
+              # - !Sub "arn:aws:s3:::${DeploymentArtifactBucket}/*"
+              - !Sub "arn:aws:s3:::*/*"
+              - !Sub "arn:aws:s3:::*"
+          - Effect: Allow
+            Action:
+              - cloudformation:CreateStack
+              - cloudformation:DescribeStacks
+              - cloudformation:DescribeStackEvents
+              - cloudformation:DescribeStackResource
+              - cloudformation:DescribeStackResources
+              - cloudformation:CreateUploadBucket
+              - cloudformation:DeleteStack
+              - cloudformation:UpdateStack
+              - cloudformation:CreateChangeSet
+              - cloudformation:ExecuteChangeSet
+              - cloudformation:DeleteChangeSet
+              - cloudformation:DescribeChangeSet
+              - cloudformation:ValidateTemplate
+              - cloudformation:ListStackResources
+            Resource: "*"
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Ref ProjectName
+      ServiceRole: !GetAtt CodeBuildServiceRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: linuxContainer
+        # ComputeType options: BUILD_GENERAL1_SMALL, BUILD_GENERAL1_MEDIUM, BUILD_GENERAL1_LARGE
+        ComputeType: BUILD_GENERAL1_SMALL
+        # Run `aws codebuild list-curated-environment-images` for a complete list of images provided.
+        Image: aws/codebuild/amazonlinux2-x86_64-standard:1.0
+        EnvironmentVariables:
+          - Name: BUILD_ARTIFACT_BUCKET
+            Value: !Ref DeploymentArtifactBucket
+      Source:
+        Type: CODEPIPELINE
+      TimeoutInMinutes: 10
+
+  # CodePipeline
+  CodePipelineServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - codepipeline.amazonaws.com
+  CodePipelineServicePolicy:
+    # This policy orchestrates CloudFormation and CodeBuild.
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: CodePipelineServicePolicy
+      Roles:
+        - !Ref CodePipelineServiceRole
+        - !Ref CodeBuildServiceRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "arn:aws:logs:*:*:*"
+          - Effect: Allow
+            Action:
+              # - s3:GetObject
+              # - s3:GetObjectVersion
+              # - s3:PutObject
+              - s3:*
+            Resource: 
+              # - !Sub "arn:aws:s3:::${DeploymentArtifactBucket}/*"
+              - !Sub "arn:aws:s3:::*/*"
+          - Effect: Allow
+            Action:
+              - cloudformation:CreateStack
+              - cloudformation:DescribeStacks
+              - cloudformation:DescribeStackResource
+              - cloudformation:DeleteStack
+              - cloudformation:UpdateStack
+              - cloudformation:CreateChangeSet
+              - cloudformation:ExecuteChangeSet
+              - cloudformation:DeleteChangeSet
+              - cloudformation:DescribeChangeSet
+              - cloudformation:ValidateTemplate
+            Resource: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/*"
+          - Effect: Allow
+            Action:
+              - codebuild:BatchGetBuilds
+              - codebuild:StartBuild
+              - codebuild:StopBuild
+            Resource: !GetAtt CodeBuildProject.Arn
+          - Effect: Allow
+            Action:
+              - iam:PassRole
+            Resource: 
+              - !GetAtt CloudFormationServiceRole.Arn
+              - !GetAtt CodeBuildServiceRole.Arn
+  CloudFormationServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - sts:AssumeRole
+            Principal:
+              Service:
+                - cloudformation.amazonaws.com
+  CloudFormationServicePolicy:
+    # This policy deloys the project's SAM template and needs permissions to create all services defined there.
+    # A number of common blocks are provided as examples.
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: CloudFormationServicePolicy
+      Roles:
+        - !Ref CloudFormationServiceRole
+        - !Ref CodeBuildServiceRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: "arn:aws:logs:*:*:*"
+          - Effect: Allow
+            Action:
+              - cloudformation:CreateChangeSet
+              - cloudformation:ListChangeSets
+            Resource: !Sub "arn:aws:cloudformation:${AWS::Region}:aws:transform/*"
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+            Resource:
+              # - !Sub "arn:aws:s3:::codepipeline-${AWS::Region}-*/*"
+              # - !Sub "arn:aws:s3:::${DeploymentArtifactBucket}/*"
+              - !Sub "arn:aws:s3:::*/*"
+          - Effect: Allow
+            Action:
+              - iam:AttachRolePolicy
+              - iam:CreateRole
+              - iam:DeleteRole
+              - iam:DeleteRolePolicy
+              - iam:DetachRolePolicy
+              - iam:GetRole
+              - iam:PassRole
+              - iam:PutRolePolicy
+            Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/*"
+          - Effect: Allow
+            Action:
+              - lambda:AddPermission
+              - lambda:CreateFunction
+              - lambda:DeleteFunction
+              - lambda:GetFunction
+              - lambda:GetFunctionConfiguration
+              - lambda:InvokeFunction
+              - lambda:RemovePermission
+              - lambda:ListFunctions
+              - lambda:TagResource
+              - lambda:UntagResource
+              - lambda:UpdateFunctionCode
+              - lambda:UpdateFunctionConfiguration
+              - lambda:ListVersionsByFunction
+              - lambda:PublishVersion
+            Resource: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:*"
+          # This block is necessary for any event mapping
+          - Effect: Allow
+            Action:
+              - lambda:CreateEventSourceMapping
+              - lambda:DeleteEventSourceMapping
+              - lambda:GetEventSourceMapping
+            Resource: "*"
+          # Lambda tagging
+          - Effect: Allow
+            Action:
+              - lambda:ListTags
+              - lambda:TagResource
+              - lambda:UntagResource
+            Resource: "*"
+          # API Gateway (REST events)
+          - Effect: Allow
+            Action:
+              - apigateway:*
+            Resource: !Sub "arn:aws:apigateway:${AWS::Region}::/*"
+          # CloudWatch event triggers
+          - Effect: Allow
+            Action:
+              - events:DeleteRule
+              - events:DescribeRule
+              - events:DisableRule
+              - events:EnableRule
+              - events:PutRule
+              - events:PutTargets
+              - events:RemoveTargets
+            Resource: !Sub "arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/*"
+          # Kinesis stream event mapping
+          - Effect: Allow
+            Action:
+              - kinesis:DescribeStreams
+              - kinesis:DescribeStream
+              - kinesis:ListStreams
+              - kinesis:GetShardIterator
+              - kinesis:GetRecords
+            Resource: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/*"
+          # DynamoBD event mapping
+          - Effect: Allow
+            Action:
+              - dynamodb:DescribeStreams
+              - dynamodb:DescribeStream
+              - dynamodb:ListStreams
+              - dynamodb:GetShardIterator
+              - dynamodb:GetRecords
+            Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/*"
+          # DynamoDB tables
+          - Effect: Allow
+            Action:
+              - dynamodb:CreateTable
+              - dynamodb:DeleteTable
+              - dynamodb:DescribeTable
+              - dynamodb:DescribeTimeToLive
+              - dynamodb:ListTagsOfResource
+              - dynamodb:TagResource
+              - dynamodb:UntagResource
+              - dynamodb:UpdateTable
+              - dynamodb:UpdateTimeToLive
+            Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/*"
+          # DynamoDB table tagging
+          - Effect: Allow
+            Action:
+              - dynamodb:ListTags
+              - dynamodb:TagResource
+              - dynamodb:UntagResource
+            Resource: "*"
+          # DynamoDB autoscaling
+          - Effect: Allow
+            Action:
+              - application-autoscaling:*
+            Resource: "*"
+          # S3
+          - Effect: Allow
+            Action:
+              - s3:CreateBucket
+              - s3:GetBucketAcl
+              - s3:GetBucketNotification
+              - s3:GetBucketTagging
+              - s3:PutBucketAcl
+              - s3:PutBucketNotification
+              - s3:PutBucketTagging
+            Resource: "*"
+          # SQS
+          - Effect: Allow
+            Action:
+              - sqs:AddPermission
+              - sqs:CreateQueue
+              - sqs:DeleteQueue
+              - sqs:GetQueueAttributes
+              - sqs:RemovePermission
+              - sqs:SetQueueAttributes
+            Resource: !Sub "arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:*"
+          # ElasticsearchService
+          - Effect: Allow
+            Action:
+              - es:*
+            Resource: "*"
+          # Appsync
+          - Effect: Allow
+            Action:
+              - appsync:*
+            Resource: !Sub "arn:aws:appsync:${AWS::Region}:${AWS::AccountId}:*"
+          # SSM Parameter Store
+          - Effect: Allow
+            Action:
+              - ssm:*
+            Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:*"
+          # KMS
+          - Effect: Allow
+            Action:
+              - kms:*
+            Resource: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:*"
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt CodePipelineServiceRole.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: ThirdParty
+                Version: 1
+                Provider: GitHub
+              OutputArtifacts:
+                - Name: SourceCodeOutputArtifact
+              Configuration:
+                Owner: !Ref GitHubRepoOwner
+                Repo: !Ref GitHubRepo
+                Branch: !Ref GitHubBranch
+                OAuthToken: !Ref GitHubOAuthToken
+              RunOrder: 1
+        - Name: Build
+          Actions:
+            - Name: CodeBuild
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Version: 1
+                Provider: CodeBuild
+              InputArtifacts:
+                - Name: SourceCodeOutputArtifact
+              OutputArtifacts:
+                - Name: BuildOutputArtifact
+              Configuration:
+                ProjectName: !Ref ProjectName
+              RunOrder: 1
+      ArtifactStore:
+        Type: S3
+        Location: !Ref DeploymentArtifactBucket
+      Name: !Ref ProjectName

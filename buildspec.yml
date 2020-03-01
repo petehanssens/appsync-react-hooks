@@ -1,0 +1,45 @@
+version: 0.2
+
+env:
+  variables:
+    MY_NAME: "PETER"
+  parameter-store:
+    now_token: "/zeit/now/token"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 10
+    commands:
+      - echo Entered the install phase...
+      - node -v 
+      - npm -v 
+      - npm install -g serverless 
+      - serverless --version 
+      - npm i -g now
+      - now --version
+      - yum install yarn -y
+      - yarn --version
+    finally:
+      - echo This always runs even if the update or install command fails 
+  build:
+    commands:
+      - echo Entered the build phase...
+      - echo Env var $MY_NAME
+      - echo Build started on `date`
+      - pwd
+      # Deploy backend services
+      - cd backend/services
+      - npm i --save
+      - sls deploy --stage dev
+      # Deploy frontend to Zeit
+      - cd ../../frontend
+      - npm i --save
+      - yarn build
+      - now -A config/dev/now.json -t $now_token
+    finally:
+      - echo This always runs even if the install command fails
+  post_build:
+    commands:
+      - echo Entered the post_build phase...
+      - echo Build completed on `date`

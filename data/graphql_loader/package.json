@@ -1,0 +1,17 @@
+{
+  "name": "graphql_loader",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^8.2.0",
+    "graphql": "^14.5.8",
+    "node-fetch": "^2.6.0"
+  }
+}

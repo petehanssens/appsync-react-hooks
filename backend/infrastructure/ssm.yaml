@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: SSM Parameters for application
+
+Parameters:
+  ApplicationName:
+    Type: String
+    Description: The name of the application.
+    Default: myApp
+  Environment:
+    Type: String
+    Description: JSON string for the parameters of the project template.
+    Default: dev
+
+Resources:
+  auth0Issuer:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: !Sub "/${ApplicationName}/${Environment}/auth0/issuer"
+      Type: "String"
+      Value: "hello"
+      Description: "Auth0 issuer - the domain."
+      Tags:
+        "Environment": !Ref Environment
+        "app": !Ref ApplicationName
+  auth0ClientId:
+    Type: "AWS::SSM::Parameter"
+    Properties:
+      Name: !Sub "/${ApplicationName}/${Environment}/auth0/clientId"
+      Type: "String"
+      Value: "hello"
+      Description: "Auth0 client id."
+      Tags:
+        "Environment": !Ref Environment
+        "app": !Ref ApplicationName
+
+  DeploymentS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${Environment}.${ApplicationName}.${AWS::Region}.deploys
+    DeletionPolicy: Retain

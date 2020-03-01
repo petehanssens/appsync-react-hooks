@@ -1,0 +1,47 @@
+type Mutation {
+
+	# Delete diaryEntry
+	deleteEvent(
+		user_id: ID!
+		date: String!
+    ): Event
+
+	# Weather
+	createEvent(
+		user_id: String!
+		date: String!
+		category: String!
+		event: String!
+	): PutEvent
+}
+
+type Query {
+	getEvents(user_id: String!, date: String!): GetEvents
+}
+
+# Weather
+
+type PutEvent {
+	user_id: String!
+	date: String!
+	category: String!
+	event: String!
+}
+
+type GetEvents {
+	user_id: String!
+	date: String!
+	diary_entry: [Event]
+}
+
+type Event {
+	created_at: String
+	created_epoch: Int
+	category: String!
+	event: String!
+}
+
+schema {
+	query: Query
+	mutation: Mutation
+}

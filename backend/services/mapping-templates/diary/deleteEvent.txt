@@ -1,0 +1,8 @@
+{
+    "version" : "2017-02-28",
+    "operation" : "DeleteItem",
+    "key" : {
+        "user_id" : { "S" : "${context.arguments.user_id}"},
+        "date" : { "S" : "${context.arguments.date}"}
+    },
+}

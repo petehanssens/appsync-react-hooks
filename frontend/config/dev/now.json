@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "name": "dev-appsync-react-hooks",
+  "build": {
+    "env": {
+      "AUTH0_DOMAIN": "@dev_appsync-react-hooks_auth0_domain",
+      "AUTH0_CLIENT_ID": "@dev_appsync-react-hooks_auth0_client_id",
+      "AUTH0_CLIENT_SECRET": "@dev_appsync-react-hooks_auth0_client_secret",
+      "REDIRECT_URI": "https://dev-appsync-react-hooks.phanssens1.now.sh/api/callback",
+      "POST_LOGOUT_REDIRECT_URI": "https://dev-appsync-react-hooks.phanssens1.now.sh/",
+      "SESSION_COOKIE_SECRET": "@dev_appsync-react-hooks_session_cookie_secret",
+      "APPSYNC_GRAPHQL_ENDPOINT": "@dev_appsync-react-hooks_appsync_graphql_endpoint",
+      "APPSYNC_AWS_REGION": "ap-southeast-2",
+      "APPSYNC_AUTHENTICATION_TYPE": "API_KEY",
+      "APPSYNC_API_KEY": "@dev_appsync-react-hooks_appsync_api_key"
+    }
+  }
+}
