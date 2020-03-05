@@ -45,18 +45,18 @@ custom:
         - dataSource: diaryAppSync
           type: Mutation
           field: createEvent
-          request: "diary/createEvent.txt"
-          response: "JSONResponse.txt"
+          request: "diary/createEvent.json"
+          response: "JSONResponse.json"
         - dataSource: diaryAppSync
           type: Query #Query, Mutation, Subscription
           field: getEvents
-          request: "diary/getEvents.txt"
-          response: "JSONResponse.txt"
+          request: "diary/getEvents.json"
+          response: "JSONResponse.json"
         - dataSource: diaryAppSync
           type: Mutation
           field: deleteEvent
-          request: "diary/deleteEvent.txt"
-          response: "JSONResponse.txt"
+          request: "diary/deleteEvent.json"
+          response: "JSONResponse.json"
     - name: ${self:custom.service.public-appsync}
       schema: src/AppSync/publicSchema.graphql
       authenticationType: API_KEY
@@ -75,18 +75,18 @@ custom:
         - dataSource: diaryAppSync
           type: Mutation
           field: createEvent
-          request: "diary/createEvent.txt"
-          response: "JSONResponse.txt"
+          request: "diary/createEvent.json"
+          response: "JSONResponse.json"
         - dataSource: diaryAppSync
           type: Query #Query, Mutation, Subscription
           field: getEvents
-          request: "diary/getEvents.txt"
-          response: "JSONResponse.txt"
+          request: "diary/getEvents.json"
+          response: "JSONResponse.json"
         - dataSource: diaryAppSync
           type: Mutation
           field: deleteEvent
-          request: "diary/deleteEvent.txt"
-          response: "JSONResponse.txt"
+          request: "diary/deleteEvent.json"
+          response: "JSONResponse.json"
 
 
 resources:

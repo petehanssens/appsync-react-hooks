@@ -4,13 +4,15 @@ const deleteEvent = gql`
   mutation deleteEvent(
       $user_id: String!
       $date: String!
+      $element: Int!
   ) {
-    deleteProject(
+    deleteEvent(
       user_id: $user_id
       date: $date
+      element: $element
     ) {
-      user_id
-      date
+      created_at
+      created_epoch
     }
   }
 `

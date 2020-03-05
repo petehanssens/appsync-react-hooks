@@ -18,19 +18,14 @@ function ViewProjects() {
   const [deleteEvent] = useMutation(Delete, {
     refetchQueries: ["getEvents"],
   });
-  const [createEvent] = useMutation(mutation,
-      {
-        onCompleted(data) {
-          Router.replace("/create_event", "/event/"+data.createEvent.user_id, { shallow: true });
-        }
-      });
+  const [createEvent] = useMutation(mutation, {
+    refetchQueries: ["getEvents"],
+  });
 
   let [form, setValues] = useState({
     user_id: 'auth0|sample-user',
     date: '2020-03-01'
   });
-  let open = () => setValues({ open: true })
-  let close = () => setValues({ open: false })
 
 
   let updateField = e => {
@@ -48,23 +43,31 @@ function ViewProjects() {
   return (
     <Layout user={user} user_loading={user_loading}>
       <h1>Daily Diary</h1>
-          {/* <Form
-            onSubmit={e => {
-              e.preventDefault();
-              console.log('form: ',form)
-              createProject({ variables: { ...form } });
-              form = '';
-            }}>
-            <Form.Input
-              fluid
-              label='Project Number'
-              name="project_number"
-              value={form.project_number}
-              placeholder="Project Number"
-              onChange={updateField}
-            />
-            <Button>Submit</Button>
-          </Form> */}
+        <Form
+          onSubmit={e => {
+            e.preventDefault();
+            console.log('form: ',form)
+            createEvent({ variables: { ...form } });
+            form = '';
+          }}>
+          <Form.Input
+            fluid
+            label='Category'
+            name="category"
+            value={form.category}
+            placeholder="Category"
+            onChange={updateField}
+          />
+          <Form.Input
+            fluid
+            label='Event'
+            name="event"
+            value={form.event}
+            placeholder="Event"
+            onChange={updateField}
+          />
+          <Button>Add event</Button>
+        </Form>
       <Table celled>
         <Table.Header>
           <Table.Row>
@@ -80,34 +83,16 @@ function ViewProjects() {
 
           <Table.Row key={index}>
           <Table.Cell>{event.category}</Table.Cell>
-          <Table.Cell>
-            <Link href="/event/[id]" as={`/event/${event.category}`}>
-              <a>{event.category}</a>
-            </Link>
-          </Table.Cell>
           <Table.Cell>{event.event}</Table.Cell>
           <Table.Cell>
             <Button 
             onClick={
-            open
-            // e => {
-            //   e.preventDefault();
-            //   console.log('project_id: ',project.project_id)
-            //   deleteProject({ variables: { ...project } });
-            // }
+            e => {
+              e.preventDefault();
+              console.log('event: ',index)
+              deleteEvent({ variables: { user_id: "auth0|sample-user", date: "2020-03-01", element: index }});
+            }
             }>Delete</Button>
-            <Confirm
-              open={form.open}
-              onCancel={close}
-              onConfirm={
-                e => {
-                e.preventDefault();
-                console.log('user_id: ',event.user_id);
-                deleteEvent({ variables: { ...event } });
-              },
-              close
-              }
-            />
           </Table.Cell>
         </Table.Row>
             ))

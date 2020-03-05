@@ -1,7 +1,7 @@
 import gql from 'graphql-tag'
 
 const getEvents = gql`
-query	(
+query	getEvents (
     $user_id: String!, 
     $date: String!
   ){

@@ -2,11 +2,12 @@ type Mutation {
 
 	# Delete diaryEntry
 	deleteEvent(
-		user_id: ID!
+		user_id: String!
 		date: String!
+		element: Int!
     ): Event
 
-	# Weather
+	# Events
 	createEvent(
 		user_id: String!
 		date: String!
@@ -19,7 +20,7 @@ type Query {
 	getEvents(user_id: String!, date: String!): GetEvents
 }
 
-# Weather
+# Events
 
 type PutEvent {
 	user_id: String!

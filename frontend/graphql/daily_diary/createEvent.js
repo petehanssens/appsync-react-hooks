@@ -1,13 +1,13 @@
 import gql from 'graphql-tag'
 
 const createEvent = gql`
-mutation getProjectInfo (
+mutation createEvent (
     $user_id: String!,
     $date: String!,
     $category: String!,
     $event: String!,
   ) {
-    getProjectInfo(
+    createEvent(
       user_id: $user_id,
       date: $date,
       category: $category,
